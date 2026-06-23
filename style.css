@@ -532,3 +532,9 @@ td .btn {
         transform:translateY(0);
     }
 }
+.container { 
+  width: 100%; 
+  max-width: 1200px; /* ถ้าเปิดในคอมจะกว้างสุดแค่ 1200px แต่ถ้าเปิดในมือถือจะหดตามจอมือถือให้เอง */
+  padding: 15px; 
+  box-sizing: border-box;
+}
