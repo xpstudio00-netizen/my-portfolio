@@ -695,3 +695,27 @@ function showToast(type,title,message){
 
     return toast;
 }
+// ========================================================
+// 📱 ส่วนเสริมสำหรับ Mobile: ระบบเมนูเปิด-ปิด (Hamburger Menu)
+// ========================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const sidebar = document.querySelector('.sidebar'); // ตรวจสอบชื่อคลาสให้ตรงกับ HTML ของคุณ
+
+    if (menuBtn && sidebar) {
+        // เมื่อกดปุ่มแฮมเบอร์เกอร์ ให้สลับคลาส active (สไลด์เปิด/ปิด)
+        menuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+        });
+    }
+
+    // ฟังก์ชันเสริม: เมื่อผู้ใช้กดเลือกเมนูใดๆ (.menu-item) ให้ซ่อน Sidebar อัตโนมัติ (เฉพาะบนมือถือ)
+    const menuItems = document.querySelectorAll('.menu-item');
+    menuItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
+                sidebar.classList.remove('active');
+            }
+        });
+    });
+});
