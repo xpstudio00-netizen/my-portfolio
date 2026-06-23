@@ -1,6 +1,6 @@
 /**
  * MEDICHEN Warehouse & Dashboard - Frontend Script
- * ✨ อัปเดตระบบรองรับสถาปัตยกรรมคัดแยกออเดอร์เชื่อม LINE Webhook & Pop-up Modal อย่างสมบูรณ์ 100%
+ * ✨ อัปเดตระบบรองรับตัวแปรใหม่จาก Backend (Gemini V2.3) + แก้ไขบัค undefined
  */
 
 const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec"; 
@@ -16,63 +16,61 @@ let lastNewOrderCount = 0;
 // 1. ตรวจสอบตอนเปิดหน้าเว็บขึ้นมาใหม่ว่าเคยล็อกอินหรือยัง
 document.addEventListener("DOMContentLoaded", () => {
     const sessionToken = localStorage.getItem("medichen_token");
-    if (sessionToken) {
-        document.getElementById("loginPage").style.display = "none";
-        // ฟังก์ชันโหลดข้อมูลตารางปกติของคุณ เช่น loadAllData();
+    const loginPage = document.getElementById("loginPage");
+    if (sessionToken && loginPage) {
+        loginPage.style.display = "none";
     }
 });
 
 // 2. ดักจับเหตุการณ์การกดส่งฟอร์ม Login
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    
-    const user = document.getElementById("loginUser").value;
-    const pass = document.getElementById("loginPass").value;
-    
-    // เรียกเชื่อมต่อไปยัง Apps Script API หลังบ้านที่เราเขียนเพิ่มไว้
-    try {
-        const response = await fetch("https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec", {
-            method: "POST",
-            body: JSON.stringify({
-                action: "login",
-                data: { username: user, password: pass }
-            })
-        });
+const loginForm = document.getElementById("loginForm");
+if (loginForm) {
+    loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
         
-        const result = await response.json();
+        const user = document.getElementById("loginUser").value;
+        const pass = document.getElementById("loginPass").value;
         
-        if (result.status === "success" && result.data.loginSuccess) {
-            // บันทึก Token ลงเครื่องพนักงาน เพื่อครั้งต่อไปจะได้ไม่ต้องกรอกซ้ำ
-            localStorage.setItem("medichen_token", result.data.token);
-            alert("ยินดีต้อนรับเข้าสู่ระบบ: " + result.data.adminName);
-            document.getElementById("loginPage").style.display = "none";
-            location.reload(); // รีโหลดข้อมูลระบบขึ้นมาแสดงผล
-        } else {
-            alert(result.message);
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({
+                    action: "login",
+                    data: { username: user, password: pass }
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === "success" && result.data.loginSuccess) {
+                localStorage.setItem("medichen_token", result.data.token);
+                alert("ยินดีต้อนรับเข้าสู่ระบบ: " + result.data.adminName);
+                document.getElementById("loginPage").style.display = "none";
+                location.reload(); 
+            } else {
+                alert(result.message);
+            }
+        } catch (err) {
+            alert("เกิดข้อผิดพลาดในการเชื่อมต่อระบบหลังบ้าน: " + err);
         }
-    } catch (err) {
-        alert("เกิดข้อผิดพลาดในการเชื่อมต่อระบบหลังบ้าน: " + err);
-    }
-});
+    });
+}
 
-// 3. ฟังก์ชันสำหรับการทำปุ่ม Log out (หากต้องการเพิ่มในภายหลัง)
+// 3. ฟังก์ชันสำหรับการทำปุ่ม Log out
 function handleLogout() {
     localStorage.removeItem("medichen_token");
     location.reload();
 }
+
 document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener(
         'click',
         () => {
-            const audio =
-                document.getElementById(
-                    'notification-sound'
-                );
+            const audio = document.getElementById('notification-sound');
             if(audio){
                 audio.play()
                 .then(() => {
                     audio.pause();
-
                     audio.currentTime = 0;
                 })
                 .catch(() => {});
@@ -112,7 +110,8 @@ function switchTab(tabId) {
     }
     
     const titles = { dashboard: '📊 แดชบอร์ด', line: '📱 ออเดอร์จาก LINE', stock: '📦 คลังสินค้า', purchase: '🛒 รายการสั่งซื้อ', shipping: '🚚 รายการจัดส่ง' };
-    document.getElementById('page-title').innerText = titles[tabId];
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.innerText = titles[tabId];
 }
 
 async function fetchAllData() {
@@ -157,115 +156,147 @@ async function callAPI(action, data = {}) {
 
 function getStatusBadge(status) {
     const safeStatus = status || 'ไม่มีสถานะ';
-    if (['ปกติ', 'จ่ายแล้ว', 'จัดส่งเสร็จแล้ว', 'ยืนยันออเดอร์'].includes(safeStatus)) return `<span class="badge badge-success">${safeStatus}</span>`;
-    if (['ใกล้หมด', 'รอโอน', 'จัดส่ง', 'กำลังจัดส่ง', 'รอระบุข้อมูล'].includes(safeStatus)) return `<span class="badge badge-warning">${safeStatus}</span>`;
+    if (['ปกติ', 'จ่ายแล้ว', 'จัดส่งเสร็จแล้ว', 'ยืนยันออเดอร์', 'AI สแกนสำเร็จ', 'AI รีสแกนสำเร็จ'].includes(safeStatus)) return `<span class="badge badge-success">${safeStatus}</span>`;
+    if (['ใกล้หมด', 'รอโอน', 'จัดส่ง', 'กำลังจัดส่ง', 'รอระบุข้อมูล', 'AI สแกนแล้วรอตรวจ'].includes(safeStatus)) return `<span class="badge badge-warning">${safeStatus}</span>`;
     if (['ออเดอร์ใหม่'].includes(safeStatus)) return `<span class="badge badge-line">${safeStatus}</span>`;
     return `<span class="badge badge-danger">${safeStatus}</span>`;
 }
 
+// 📱 1. แสดงตารางออเดอร์จาก LINE (แก้ไขตัวแปรให้ตรงกับ App Script)
 function renderLineTable() {
     const tbody = document.querySelector('#table-line tbody');
     if (!tbody) return;
-    tbody.innerHTML = state.line.map((i, index) => `
+
+    // กรองเอาเฉพาะรายการที่สถานะ "ไม่ใช่" ยืนยันออเดอร์แล้ว (เพราะกดยืนยันแล้วจะย้ายไปหน้าขนส่ง)
+    const activeLineOrders = state.line.filter(i => i.status !== 'ยืนยันออเดอร์แล้ว');
+
+    tbody.innerHTML = activeLineOrders.map((i) => {
+        // ใช้ confirmDate หรือถ้ายังว่างอยู่ให้แสดงเป็น "รอตรวจสอบ"
+        let displayDate = i.confirmDate ? i.confirmDate : "รอตรวจสอบ";
+        // AI จะสรุปสินค้ามาให้ใน items ส่วนถ้าพิมพ์ปกติจากไลน์จะอยู่ใน notes
+        let displayItems = i.items ? i.items : (i.notes ? i.notes : "-");
+        
+        return `
         <tr>
-            <td>${i.id}</td>
-            <td>${i.date}</td>
-            <td style="max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${i.product || '-'}</b></td>
-            <td>${i.qty ? i.qty + ' ' + (i.unit || '') : '-'}</td>
-            <td>${i.price ? parseInt(i.price).toLocaleString() + ' บ.' : '-'}</td>
-            <td>${i.destination || '-'}</td>
+            <td>${displayDate}</td>
+            <td style="max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${displayItems}</b></td>
+            <td>${i.address || '-'}</td>
             <td>${getStatusBadge(i.status || 'ออเดอร์ใหม่')}</td>
             <td>
-                <button class="btn btn-primary" onclick="openLineModal(${index})">📝 แยกข้อมูล / ดู</button>
+                <button class="btn btn-primary" onclick="openLineModal('${i.id}')">📝 แยกข้อมูล / ดู</button>
                 <button class="btn btn-danger" onclick="handleDelete('deleteLineOrder', '${i.id}')">ลบ</button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
-function openLineModal(index) {
-    isEditing = true; // ล็อกระบบไม่ให้ Auto-Refresh เบื้องหลังทำข้อมูลหาย
-    const item = state.line[index];
+function openLineModal(id) {
+    isEditing = true; 
+    const item = state.line.find(x => String(x.id) === String(id));
     if (!item) return;
 
+    // แมปตัวแปรใหม่จาก App Script เข้าหน้าฟอร์ม (ถ้าตัวไหนไม่มีให้ปล่อยว่าง)
     document.getElementById('edit-line-id').value = item.id;
-    document.getElementById('edit-line-date').value = formatSafeDate(item.date);
-    document.getElementById('edit-line-product').value = item.product || '';
-    document.getElementById('edit-line-qty').value = item.qty || '';
-    document.getElementById('edit-line-unit').value = item.unit || '';
-    document.getElementById('edit-line-price').value = item.price || '';
-    document.getElementById('edit-line-company').value = item.company || '';
-    document.getElementById('edit-line-destination').value = item.destination || '';
+    document.getElementById('edit-line-date').value = formatSafeDate(item.confirmDate);
+    
+    // ช่องรายละเอียดสินค้า รวมทั้งจาก AI (items) และไลน์ปกติ (notes)
+    document.getElementById('edit-line-product').value = item.items || item.notes || '';
+    
+    // กรณีที่ HTML ยังมีช่อง Qty และ Unit ให้เคลียร์ค่าเป็นว่างไว้ เนื่องจาก AI สรุปรวมมาให้ใน Product แล้ว
+    const qtyEl = document.getElementById('edit-line-qty');
+    const unitEl = document.getElementById('edit-line-unit');
+    if(qtyEl) qtyEl.value = '';
+    if(unitEl) unitEl.value = '';
+
+    document.getElementById('edit-line-price').value = item.totalAmount || '';
+    document.getElementById('edit-line-company').value = item.hospitalName || '';
+    document.getElementById('edit-line-destination').value = item.address || '';
     document.getElementById('edit-line-status').value = item.status || 'ออเดอร์ใหม่';
 
     document.getElementById('line-modal').style.display = 'flex';
 }
 
 function closeLineModal() {
-    document.getElementById('line-modal').style.display = 'none';
-    document.getElementById('form-edit-line').reset();
+    const modal = document.getElementById('line-modal');
+    if (modal) modal.style.display = 'none';
+    const form = document.getElementById('form-edit-line');
+    if (form) form.reset();
     isEditing = false;
 }
 
 async function saveLineOrderEdit(event) {
     event.preventDefault();
+    // ส่ง Key กลับไปให้ตรงกับที่หลังบ้านคาดหวัง เพื่อความสมบูรณ์ 100%
     let payload = {
         id: document.getElementById('edit-line-id').value,
-        date: document.getElementById('edit-line-date').value,
-        product: document.getElementById('edit-line-product').value,
-        qty: document.getElementById('edit-line-qty').value,
-        unit: document.getElementById('edit-line-unit').value,
-        price: document.getElementById('edit-line-price').value,
-        company: document.getElementById('edit-line-company').value,
-        destination: document.getElementById('edit-line-destination').value,
+        confirmDate: document.getElementById('edit-line-date').value,
+        items: document.getElementById('edit-line-product').value,
+        totalAmount: document.getElementById('edit-line-price').value,
+        hospitalName: document.getElementById('edit-line-company').value,
+        address: document.getElementById('edit-line-destination').value,
         status: document.getElementById('edit-line-status').value
     };
 
-    const loadingToast = showToast(
-    'loading',
-    'กำลังบันทึกข้อมูล',
-    'กรุณารอสักครู่...'
-);
+    const loadingToast = showToast('loading', 'กำลังบันทึกข้อมูล', 'กรุณารอสักครู่...');
 
-try {
+    try {
+        const res = await callAPI('updateLineOrder', payload);
+        loadingToast.remove();
 
-    const res = await callAPI('updateLineOrder', payload);
-
-    loadingToast.remove();
-
-    if (res.status === 'success') {
-
-        closeLineModal();
-        await fetchAllData();
-
-        showToast(
-            'success',
-            'บันทึกสำเร็จ',
-            'คัดแยกและแก้ไขออเดอร์เรียบร้อยแล้ว'
-        );
-
-    } else {
-
-        showToast(
-            'error',
-            'เกิดข้อผิดพลาด',
-            res.message
-        );
+        if (res.status === 'success') {
+            closeLineModal();
+            await fetchAllData();
+            showToast('success', 'บันทึกสำเร็จ', 'คัดแยกและแก้ไขออเดอร์เรียบร้อยแล้ว');
+        } else {
+            showToast('error', 'เกิดข้อผิดพลาด', res.message);
+        }
+    } catch (error) {
+        loadingToast.remove();
+        showToast('error', 'เชื่อมต่อล้มเหลว', error.message);
     }
-
-} catch (error) {
-
-    loadingToast.remove();
-
-    showToast(
-        'error',
-        'เชื่อมต่อล้มเหลว',
-        error.message
-    );
-}
 }
 
-// --- ฟังก์ชันเดิมที่มีอยู่ ทำหน้าที่บริหารตารางหลังบ้านร่วมกันอย่างสมบูรณ์ ---
+// 🚚 2. แสดงหน้ารายการจัดส่ง
+function renderShippingTable() {
+    const tbody = document.querySelector('#table-shipping tbody');
+    if (!tbody) return;
+
+    let html = state.shipping.map((i, index) => `
+        <tr id="row-shipping-${index}">
+            <td>${i.id || index + 1}</td>
+            <td class="cell-date">${i.date}</td>
+            <td class="cell-product">${i.product}</td>
+            <td class="cell-company">${i.company || '-'}</td>
+            <td class="cell-destination">${i.destination}</td>
+            <td class="cell-status">${getStatusBadge(i.status || 'เตรียมสินค้า')}</td>
+            <td>
+                <button class="btn btn-warning" onclick="enableEdit('shipping', ${index})">แก้ไข</button>
+                <button class="btn btn-danger" onclick="handleDelete('deleteShipping', '${i.id}')">ลบ</button>
+            </td>
+        </tr>
+    `).join('');
+
+    // ส่วนที่ 2: รายการจาก LINE (ใช้ตัวแปรใหม่ confirmDate, items, hospitalName, address)
+    const confirmedLineOrders = state.line.filter(i => i.status === 'ยืนยันออเดอร์');
+    
+    html += confirmedLineOrders.map((i) => `
+        <tr style="background-color: #f1f5f9;">
+            <td><span style="font-size:11px; background:#0284c7; color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold;">LINE</span>-${i.id.replace('ORD-','')}</td>
+            <td>${i.confirmDate || "รอตรวจสอบ"}</td>
+            <td><b>${i.items || i.notes || '-'}</b></td>
+            <td>${i.hospitalName || 'รอระบุขนส่ง'}</td>
+            <td>${i.address || '-'}</td>
+            <td>${getStatusBadge(i.status)}</td>
+            <td>
+                <button class="btn btn-primary" onclick="openLineModal('${i.id}')">📝 แก้ไขข้อมูลออเดอร์</button>
+                <button class="btn btn-danger" onclick="handleDelete('deleteLineOrder', '${i.id}')">ลบ</button>
+            </td>
+        </tr>
+    `).join('');
+
+    tbody.innerHTML = html;
+}
+
 function showDashboardList(type) {
     currentDashboardType = type;
     const defaultView = document.getElementById('dashboard-default-view');
@@ -307,13 +338,17 @@ function showDashboardList(type) {
             </div>`;
         container.innerHTML = html;
     } else if (type === 'shipping') {
+        const normalShippingRows = state.shipping.map(i => `<tr><td>${i.date}</td><td>${i.product}</td><td>${i.destination}</td><td>${getStatusBadge(i.status || 'เตรียมสินค้า')}</td></tr>`).join('');
+        // แมปตัวแปรของ LINE Orders ให้ถูกต้อง (confirmDate, items, address)
+        const lineShippingRows = state.line.filter(i => i.status === 'ยืนยันออเดอร์').map(i => `<tr style="background-color: #f1f5f9;"><td>${i.confirmDate || "รอตรวจสอบ"}</td><td>[LINE] ${i.items || i.notes || '-'}</td><td>${i.address || '-'}</td><td>${getStatusBadge(i.status)}</td></tr>`).join('');
+
         html = `
             <div class="card">
-                <h3>🚚 รายการจัดส่ง</h3>
+                <h3>🚚 รายการจัดส่งรวมปัจจุบัน</h3>
                 <div class="table-responsive">
                     <table class="minimal-table">
                         <thead><tr><th>วันที่</th><th>สินค้า</th><th>ปลายทาง</th><th>สถานะ</th></tr></thead>
-                        <tbody>${state.shipping.map(i => `<tr><td>${i.date}</td><td>${i.product}</td><td>${i.destination}</td><td>${getStatusBadge(i.status || 'เตรียมสินค้า')}</td></tr>`).join('')}</tbody>
+                        <tbody>${normalShippingRows + lineShippingRows}</tbody>
                     </table>
                 </div>
             </div>`;
@@ -342,11 +377,19 @@ function renderDashboard() {
     const warning = state.stock.filter(i => i.status === 'ใกล้หมด').length;
     const critical = state.stock.filter(i => i.status === 'หมด').length;
 
-    document.getElementById('count-normal').innerText = normal;
-    document.getElementById('count-warning').innerText = warning;
-    document.getElementById('count-critical').innerText = critical;
-    document.getElementById('count-purchase').innerText = state.purchase.length;
-    document.getElementById('count-shipping').innerText = state.shipping.length;
+    const lineShippingCount = state.line.filter(i => i.status === 'ยืนยันออเดอร์').length;
+
+    const cNormal = document.getElementById('count-normal');
+    const cWarning = document.getElementById('count-warning');
+    const cCritical = document.getElementById('count-critical');
+    const cPurchase = document.getElementById('count-purchase');
+    const cShipping = document.getElementById('count-shipping');
+
+    if(cNormal) cNormal.innerText = normal;
+    if(cWarning) cWarning.innerText = warning;
+    if(cCritical) cCritical.innerText = critical;
+    if(cPurchase) cPurchase.innerText = state.purchase.length;
+    if(cShipping) cShipping.innerText = state.shipping.length + lineShippingCount;
 
     const quickBody = document.querySelector('#quick-stock-table tbody');
     if(quickBody) {
@@ -359,10 +402,9 @@ function renderDashboard() {
 
 function renderChart() {
     const chartCanvas = document.getElementById('stockChart');
+    if (!chartCanvas) return;
 
-if (!chartCanvas) return;
-
-const ctx = chartCanvas.getContext('2d');
+    const ctx = chartCanvas.getContext('2d');
     const labels = state.stock.map(i => i.product);
     const dataValues = state.stock.map(i => parseInt(i.qty) || 0);
     const colors = state.stock.map(i => i.status === 'ปกติ' ? '#10b981' : (i.status === 'ใกล้หมด' ? '#f59e0b' : '#ef4444'));
@@ -377,6 +419,7 @@ const ctx = chartCanvas.getContext('2d');
 
 function renderStockTable() {
     const tbody = document.querySelector('#table-stock tbody');
+    if (!tbody) return;
     tbody.innerHTML = state.stock.map((i, index) => `
         <tr id="row-stock-${index}">
             <td>${i.id || index + 1}</td>
@@ -394,6 +437,7 @@ function renderStockTable() {
 
 function renderPurchaseTable() {
     const tbody = document.querySelector('#table-purchase tbody');
+    if (!tbody) return;
     tbody.innerHTML = state.purchase.map((i, index) => `
         <tr id="row-purchase-${index}">
             <td>${i.id || index + 1}</td>
@@ -403,24 +447,6 @@ function renderPurchaseTable() {
             <td>
                 <button class="btn btn-warning" onclick="enableEdit('purchase', ${index})">แก้ไข</button>
                 <button class="btn btn-danger" onclick="handleDelete('deletePurchase', '${i.id}')">ลบ</button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function renderShippingTable() {
-    const tbody = document.querySelector('#table-shipping tbody');
-    tbody.innerHTML = state.shipping.map((i, index) => `
-        <tr id="row-shipping-${index}">
-            <td>${i.id || index + 1}</td>
-            <td class="cell-date">${i.date}</td>
-            <td class="cell-product">${i.product}</td>
-            <td class="cell-company">${i.company}</td>
-            <td class="cell-destination">${i.destination}</td>
-            <td class="cell-status">${getStatusBadge(i.status || 'เตรียมสินค้า')}</td>
-            <td>
-                <button class="btn btn-warning" onclick="enableEdit('shipping', ${index})">แก้ไข</button>
-                <button class="btn btn-danger" onclick="handleDelete('deleteShipping', '${i.id}')">ลบ</button>
             </td>
         </tr>
     `).join('');
@@ -497,11 +523,7 @@ async function saveEdit(type, index) {
     const item = state[type][index];
     let payload = { id: item.id }; 
     let action = '';
-    const loadingToast = showToast(
-    'loading',
-    'กำลังบันทึก',
-    'กรุณารอสักครู่...'
-);
+    const loadingToast = showToast('loading', 'กำลังบันทึก', 'กรุณารอสักครู่...');
 
     try {
         if (type === 'stock') {
@@ -529,26 +551,13 @@ async function saveEdit(type, index) {
         if (res.status === 'success') {
             isEditing = false; 
             await fetchAllData();
-            showToast(
-    'success',
-    'บันทึกสำเร็จ',
-    'บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว'
-);
+            showToast('success', 'บันทึกสำเร็จ', 'บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว');
         } else {
-            showToast(
-    'error',
-    'เกิดข้อผิดพลาด',
-    res.message
-);
+            showToast('error', 'เกิดข้อผิดพลาด', res.message);
         }
     } catch (error) {
-       loadingToast.remove();
-
-showToast(
-    'error',
-    'เชื่อมต่อไม่สำเร็จ',
-    error.message
-);
+        loadingToast.remove();
+        showToast('error', 'เชื่อมต่อไม่สำเร็จ', error.message);
     }
 }
 
@@ -577,18 +586,17 @@ async function handleFormSubmit(event, action) {
             showToast('error', 'ไม่สามารถเพิ่มข้อมูลได้', res.message);
         }
     } catch (error) {
-        loadingToast.remove(); // เพิ่มคำสั่งตรงนี้ เพื่อไม่ให้หน้าโหลดหมุนค้าง
+        loadingToast.remove(); 
         showToast('error', 'เกิดข้อผิดพลาด', error.message);
     }
 }
 
 async function handleDelete(action, id) {
     if (confirm("คุณแน่ใจหรือไม่ที่จะลบรายการข้อมูลนี้ออกจากระบบอย่างถาวร?")) {
-        // เพิ่มตัวแปร loadingToast เข้ามา เพื่อไม่ให้โค้ดพัง
         const loadingToast = showToast('loading', 'กำลังลบข้อมูล', 'กรุณารอสักครู่...');
         try {
             const res = await callAPI(action, { id });
-            loadingToast.remove(); // ตอนนี้จะไม่ Error แล้วครับ
+            loadingToast.remove(); 
             
             if (res.status === 'success') {
                 await fetchAllData();
@@ -597,34 +605,31 @@ async function handleDelete(action, id) {
                 showToast('error', 'ไม่สามารถลบข้อมูลได้', res.message);
             }
         } catch (error) {
-            loadingToast.remove(); // ปิดแจ้งเตือนโหลดกรณีเชื่อมต่อพัง
+            loadingToast.remove(); 
             showToast('error', 'เกิดข้อผิดพลาด', error.message);
         }
     }
 }
-function updateNotificationBell() {
 
+function updateNotificationBell() {
     const count = state.line.filter(
         x => (x.status || 'ออเดอร์ใหม่') === 'ออเดอร์ใหม่'
     ).length;
 
     const badge = document.getElementById('notification-count');
-
     if (!badge) return;
 
     badge.innerText = count;
 
     if (count > lastNewOrderCount && lastNewOrderCount !== 0) {
-
         playNotificationSound();
-
         const bell = document.getElementById('notification-bell');
-
-        bell.classList.remove('notification-pulse');
-
-        setTimeout(() => {
-            bell.classList.add('notification-pulse');
-        }, 50);
+        if(bell) {
+            bell.classList.remove('notification-pulse');
+            setTimeout(() => {
+                bell.classList.add('notification-pulse');
+            }, 50);
+        }
 
         showToast(
             'success',
@@ -633,47 +638,28 @@ function updateNotificationBell() {
         );
     }
 
-    if(lastNewOrderCount === 0){
     lastNewOrderCount = count;
-    return;
-}
-
-lastNewOrderCount = count;
 }
 
 function playNotificationSound(){
-
     const audio = document.getElementById('notification-sound');
-
     if(audio){
-
         audio.currentTime = 0;
-
         audio.play().catch(() => {});
     }
 }
 
 function showToast(type,title,message){
-
-    const container =
-        document.getElementById('toast-container');
-
+    const container = document.getElementById('toast-container');
     if(!container) return;
 
     const toast = document.createElement('div');
-
     toast.className = `toast ${type}`;
 
     let icon='';
-
-    if(type==='loading')
-        icon='<span class="spinner"></span>';
-
-    if(type==='success')
-        icon='✅';
-
-    if(type==='error')
-        icon='❌';
+    if(type==='loading') icon='<span class="spinner"></span>';
+    if(type==='success') icon='✅';
+    if(type==='error') icon='❌';
 
     toast.innerHTML=`
         <div class="toast-title">
@@ -687,7 +673,6 @@ function showToast(type,title,message){
     container.appendChild(toast);
 
     if(type!=='loading'){
-
         setTimeout(()=>{
             toast.remove();
         },2500);
@@ -695,25 +680,24 @@ function showToast(type,title,message){
 
     return toast;
 }
+
 // ========================================================
 // 📱 ส่วนเสริมสำหรับ Mobile: ระบบเมนูเปิด-ปิด (Hamburger Menu)
 // ========================================================
 document.addEventListener('DOMContentLoaded', () => {
     const menuBtn = document.getElementById('mobile-menu-btn');
-    const sidebar = document.querySelector('.sidebar'); // ตรวจสอบชื่อคลาสให้ตรงกับ HTML ของคุณ
+    const sidebar = document.querySelector('.sidebar'); 
 
     if (menuBtn && sidebar) {
-        // เมื่อกดปุ่มแฮมเบอร์เกอร์ ให้สลับคลาส active (สไลด์เปิด/ปิด)
         menuBtn.addEventListener('click', () => {
             sidebar.classList.toggle('active');
         });
     }
 
-    // ฟังก์ชันเสริม: เมื่อผู้ใช้กดเลือกเมนูใดๆ (.menu-item) ให้ซ่อน Sidebar อัตโนมัติ (เฉพาะบนมือถือ)
     const menuItems = document.querySelectorAll('.menu-item');
     menuItems.forEach(item => {
         item.addEventListener('click', () => {
-            if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
+            if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('active')) {
                 sidebar.classList.remove('active');
             }
         });
