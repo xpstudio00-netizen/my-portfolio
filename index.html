@@ -46,7 +46,7 @@
             </div>
         </aside>
 
-        <aside class="main-content">
+        <main class="main-content">
             <header class="top-header">
                 <h1 id="page-title">แดชบอร์ด</h1>
 
@@ -127,8 +127,11 @@
                         <table id="table-line" class="main-table">
                             <thead>
                                 <tr>
+                                    <th>ID ออเดอร์</th>
                                     <th>วันที่</th>
                                     <th>รายการ / ข้อความสั่งซื้อ (PO)</th>
+                                    <th>จำนวน</th>
+                                    <th>ราคา</th>
                                     <th>ปลายทาง</th>
                                     <th>สถานะ</th>
                                     <th>จัดการ</th>
@@ -213,7 +216,7 @@
                     </div>
                 </div>
             </section>
-        </aside>
+        </main>
     </div>
 
     <div id="line-modal" class="modal-overlay">
@@ -240,8 +243,7 @@
                         <span style="font-weight: 500; color: var(--text-main);">📦 รายการสินค้าคัดแยกแยกแถว</span>
                         <button type="button" class="btn" style="padding: 4px 10px; font-size: 12px; width: auto; background: #cbd5e1; color: #334155; border: 1px solid var(--border);" onclick="addModalItemRow('', '', '')">➕ เพิ่มช่องรายการ</button>
                     </label>
-                    <div id="modal-dynamic-items-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
-                        </div>
+                    <div id="modal-dynamic-items-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;"></div>
                 </div>
 
                 <div style="display:flex; gap:12px; margin-bottom:12px;">
@@ -285,7 +287,6 @@
     </audio>
     
     <script>
-        // ฟังก์ชันในการสร้างแถวข้อมูล สินค้า - จำนวน - หน่วย ในโมดอล
         function addModalItemRow(name, qty, unit) {
             const container = document.getElementById('modal-dynamic-items-container');
             const row = document.createElement('div');
@@ -294,7 +295,6 @@
             row.style.gap = '8px';
             row.style.alignItems = 'center';
 
-            // ล้างหัวข้อตัวเลขที่ติดมากับข้อความเช่น "1. ", "2) " ออกให้สะอาดก่อนนำไปวางใน Input เพื่อความสะดวกในการตรวจแก้ไข
             let cleanName = name.replace(/^\d+[\.\s\-:\)]+\s*/, '').trim();
 
             row.innerHTML = `
@@ -306,10 +306,9 @@
             container.appendChild(row);
         }
 
-        // หากแอดมินลบช่องออกจนหมดเกลี้ยง ระบบจะเพิ่มช่องว่างเปล่าขึ้นมาแสตนด์บายไว้ 1 ช่องทันที
         function checkModalItemsCount() {
             const container = document.getElementById('modal-dynamic-items-container');
-            if (container.children.length === 0) {
+            if (container && container.children.length === 0) {
                 addModalItemRow('', '', '');
             }
         }
