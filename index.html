@@ -46,7 +46,7 @@
             </div>
         </aside>
 
-        <main class="main-content">
+        <aside class="main-content">
             <header class="top-header">
                 <h1 id="page-title">แดชบอร์ด</h1>
 
@@ -111,7 +111,7 @@
                                             <th>จำนวน</th>
                                             <th>สถานะ</th>
                                         </tr>
-                                    </tbody>
+                                    </thead>
                                     <tbody></tbody>
                                 </table>
                             </div>
@@ -213,35 +213,37 @@
                     </div>
                 </div>
             </section>
-        </main>
+        </aside>
     </div>
 
     <div id="line-modal" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 650px;">
             <div class="modal-header">
                 <h2>📱 จัดการคัดแยกออเดอร์จาก LINE</h2>
                 <button class="close-btn" onclick="closeLineModal()">&times;</button>
             </div>
             <form id="form-edit-line" onsubmit="saveLineOrderEdit(event)">
                 <input type="hidden" id="edit-line-id">
+                
                 <div class="form-group">
                     <label>วันที่รายการเข้า</label>
                     <input type="date" id="edit-line-date" required>
                 </div>
+                
                 <div class="form-group">
-                    <label>ชื่อรายการ / ข้อความสั่งซื้อจริงจาก LINE</label>
-                    <textarea id="edit-line-product" rows="3" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; outline:none; font-family:inherit;" required></textarea>
+                    <label>ชื่อรายการ / ข้อความสั่งซื้อจริงจาก LINE (ข้อความดิบ)</label>
+                    <textarea id="edit-line-product" rows="2" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; outline:none; font-family:inherit;" required></textarea>
                 </div>
-                <div style="display:flex; gap:12px; margin-bottom:12px;">
-                    <div style="flex:1;">
-                        <label>จำนวน</label>
-                        <input type="number" id="edit-line-qty" placeholder="เช่น 10" min="0">
-                    </div>
-                    <div style="flex:1;">
-                        <label>หน่วย</label>
-                        <input type="text" id="edit-line-unit" placeholder="เช่น กล่อง, ถัง">
-                    </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 6px;">
+                        <span style="font-weight: 500; color: var(--text-main);">📦 รายการสินค้าคัดแยกแยกแถว</span>
+                        <button type="button" class="btn" style="padding: 4px 10px; font-size: 12px; width: auto; background: #cbd5e1; color: #334155; border: 1px solid var(--border);" onclick="addModalItemRow('', '', '')">➕ เพิ่มช่องรายการ</button>
+                    </label>
+                    <div id="modal-dynamic-items-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
+                        </div>
                 </div>
+
                 <div style="display:flex; gap:12px; margin-bottom:12px;">
                     <div style="flex:1;">
                         <label>ราคารวม (บาท)</label>
@@ -252,10 +254,12 @@
                         <input type="text" id="edit-line-company" placeholder="เช่น Flash, Kerry">
                     </div>
                 </div>
+                
                 <div class="form-group" style="margin-bottom:12px;">
                     <label>ปลายทางจัดส่ง</label>
                     <input type="text" id="edit-line-destination" placeholder="เช่น โรงพยาบาลศูนย์สกลนคร" style="width:100%;">
                 </div>
+                
                 <div class="form-group" style="margin-bottom:20px;">
                     <label>สถานะรายการ</label>
                     <select id="edit-line-status" style="width:100%;" required>
@@ -265,6 +269,7 @@
                         <option value="ยกเลิกออเดอร์">🔴 ยกเลิกออเดอร์</option>
                     </select>
                 </div>
+                
                 <div class="modal-footer">
                     <button type="button" class="btn btn-danger" onclick="closeLineModal()">ยกเลิก</button>
                     <button type="submit" class="btn btn-success">💾 บันทึกอัปเดตข้อมูล</button>
@@ -278,6 +283,37 @@
     <audio id="notification-sound">
         <source src="notification.mp3" type="audio/mpeg">
     </audio>
+    
+    <script>
+        // ฟังก์ชันในการสร้างแถวข้อมูล สินค้า - จำนวน - หน่วย ในโมดอล
+        function addModalItemRow(name, qty, unit) {
+            const container = document.getElementById('modal-dynamic-items-container');
+            const row = document.createElement('div');
+            row.className = 'modal-dynamic-product-row';
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+
+            // ล้างหัวข้อตัวเลขที่ติดมากับข้อความเช่น "1. ", "2) " ออกให้สะอาดก่อนนำไปวางใน Input เพื่อความสะดวกในการตรวจแก้ไข
+            let cleanName = name.replace(/^\d+[\.\s\-:\)]+\s*/, '').trim();
+
+            row.innerHTML = `
+                <input type="text" class="form-control modal-input-item-name" value="${cleanName}" placeholder="ชื่อสินค้าทางการแพทย์" style="flex: 2; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; outline: none;" required>
+                <input type="number" class="form-control modal-input-item-qty" value="${qty || ''}" placeholder="จำนวน" style="width: 80px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; outline: none;" min="0">
+                <input type="text" class="form-control modal-input-item-unit" value="${unit || ''}" placeholder="หน่วย" style="width: 80px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; outline: none;">
+                <button type="button" style="background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;" onclick="this.parentElement.remove(); checkModalItemsCount();">🗑️</button>
+            `;
+            container.appendChild(row);
+        }
+
+        // หากแอดมินลบช่องออกจนหมดเกลี้ยง ระบบจะเพิ่มช่องว่างเปล่าขึ้นมาแสตนด์บายไว้ 1 ช่องทันที
+        function checkModalItemsCount() {
+            const container = document.getElementById('modal-dynamic-items-container');
+            if (container.children.length === 0) {
+                addModalItemRow('', '', '');
+            }
+        }
+    </script>
     
     <script src="script.js"></script>
 </body>
