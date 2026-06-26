@@ -17,15 +17,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener(
         'click',
         () => {
-            const audio =
-                document.getElementById(
-                    'notification-sound'
-                );
+            const audio = document.getElementById('notification-sound');
             if(audio){
                 audio.play()
                 .then(() => {
                     audio.pause();
-
                     audio.currentTime = 0;
                 })
                 .catch(() => {});
@@ -65,15 +61,8 @@ function switchTab(tabId) {
     }
     
     const titles = { dashboard: '📊 แดชบอร์ด', line: '📱 ออเดอร์จาก LINE', stock: '📦 คลังสินค้า', purchase: '🛒 รายการสั่งซื้อ', shipping: '🚚 รายการจัดส่ง' };
-    document.getElementById('page-title').innerText = titles[tabId];
-}
-
-function getStatusBadge(status) {
-    const safeStatus = status || 'ไม่มีสถานะ';
-    if (['ปกติ', 'จ่ายแล้ว', 'จัดส่งเสร็จแล้ว', 'ยืนยันออเดอร์'].includes(safeStatus)) return `<span class="badge badge-success">${safeStatus}</span>`;
-    if (['ใกล้หมด', 'รอโอน', 'จัดส่ง', 'กำลังจัดส่ง', 'รอระบุข้อมูล'].includes(safeStatus)) return `<span class="badge badge-warning">${safeStatus}</span>`;
-    if (['ออเดอร์ใหม่'].includes(safeStatus)) return `<span class="badge badge-line">${safeStatus}</span>`;
-    return `<span class="badge badge-danger">${safeStatus}</span>`;
+    const pageTitle = document.getElementById('page-title');
+    if (pageTitle) pageTitle.innerText = titles[tabId];
 }
 
 async function fetchAllData() {
@@ -116,6 +105,14 @@ async function callAPI(action, data = {}) {
     return await response.json();
 }
 
+function getStatusBadge(status) {
+    const safeStatus = status || 'ไม่มีสถานะ';
+    if (['ปกติ', 'จ่ายแล้ว', 'จัดส่งเสร็จแล้ว', 'ยืนยันออเดอร์'].includes(safeStatus)) return `<span class="badge badge-success">${safeStatus}</span>`;
+    if (['ใกล้หมด', 'รอโอน', 'จัดส่ง', 'กำลังจัดส่ง', 'รอระบุข้อมูล'].includes(safeStatus)) return `<span class="badge badge-warning">${safeStatus}</span>`;
+    if (['ออเดอร์ใหม่'].includes(safeStatus)) return `<span class="badge badge-line">${safeStatus}</span>`;
+    return `<span class="badge badge-danger">${safeStatus}</span>`;
+}
+
 function renderLineTable() {
     const tbody = document.querySelector('#table-line tbody');
     if (!tbody) return;
@@ -136,9 +133,8 @@ function renderLineTable() {
     `).join('');
 }
 
-// 📦 เปิดโมดอลแก้ไขข้อมูลไลน์ พร้อมแตกช่องป้อนข้อมูลตามรายการสินค้าที่มีจริง
 function openLineModal(index) {
-    isEditing = true; // ล็อกระบบไม่ให้ Auto-Refresh เบื้องหลังทำข้อมูลหาย
+    isEditing = true; 
     const item = state.line[index];
     if (!item) return;
 
@@ -150,30 +146,26 @@ function openLineModal(index) {
     document.getElementById('edit-line-destination').value = item.destination || '';
     document.getElementById('edit-line-status').value = item.status || 'ออเดอร์ใหม่';
 
-    // 🧠 ระบบประมวลผลแตกช่องป้อนข้อมูลแยกตามบรรทัดรายการสินค้า
     const container = document.getElementById('modal-dynamic-items-container');
     if (container) {
-        container.innerHTML = ''; // ล้างแถวข้อมูลเก่าทิ้งก่อน
+        container.innerHTML = ''; 
         const rawProductText = item.product || '';
         
         if (rawProductText) {
             const lines = rawProductText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
             
             lines.forEach(line => {
-                // ล้างหัวข้อลำดับ "1. " ออกก่อนการสแกนจับกลุ่มข้อความ
                 let cleanLine = line.replace(/^\d+[\.\s\-:\)]+\s*/, '').trim();
                 let name = cleanLine;
                 let qty = '';
                 let unit = '';
 
-                // แพทเทิร์นที่ 1: ตรวจจับกรณีมีคำว่า "จำนวน [ตัวเลข] [หน่วย]"
                 let matchQuantity = cleanLine.match(/(.*?)\s+จำนวน\s*([\d\.,]+)\s*(\S*)/i);
                 if (matchQuantity) {
                     name = matchQuantity[1].trim();
                     qty = matchQuantity[2].trim();
                     unit = matchQuantity[3].trim();
                 } else {
-                    // แพทเทิร์นที่ 2: ตรวจจับตัวเลขและหน่วยท้ายแถวแบบทั่วไป (เช่น หน้ากากอนามัย 100 กล่อง)
                     let matchSimple = cleanLine.match(/(.*?)\s+([\d\.,]+)\s*([^\d\s\.,]+)$/);
                     if (matchSimple) {
                         name = matchSimple[1].trim();
@@ -181,13 +173,11 @@ function openLineModal(index) {
                         unit = matchSimple[3].trim();
                     }
                 }
-                // สั่งสร้างและแสดงแถวช่องป้อนข้อมูลบนโมดอล HTML
                 if (typeof addModalItemRow === 'function') {
                     addModalItemRow(name, qty, unit);
                 }
             });
         }
-        
         if (typeof checkModalItemsCount === 'function') {
             checkModalItemsCount();
         }
@@ -204,11 +194,9 @@ function closeLineModal() {
     isEditing = false;
 }
 
-// 💾 รวบรวมข้อมูลทุกแถวสินค้าไดนามิกมาแปลงเป็นสายสตริงระเบียบก่อนส่งเซฟลง Sheets
 async function saveLineOrderEdit(event) {
     event.preventDefault();
     
-    // วิ่งกวาดข้อมูลจากแถวป้อนข้อมูลสินค้าในโมดอลทั้งหมด
     const rows = document.querySelectorAll('.modal-dynamic-product-row');
     let combinedItemsArray = [];
     let firstRowQty = '';
@@ -220,17 +208,15 @@ async function saveLineOrderEdit(event) {
         const unit = row.querySelector('.modal-input-item-unit').value.trim();
         
         if (name) {
-            let itemText = `${name}`;
-            if (qty) itemString = `${name} จำนวน ${qty}`;
-            if (unit && qty) itemString += ` ${unit}`;
-            else if (unit) itemString += ` ${unit}`;
+            let itemString = name;
+            if (qty) itemString += ` จำนวน ${qty}`;
+            if (unit) itemString += ` ${unit}`;
             
             combinedItemsArray.push(`${index + 1}. ${itemString}`);
             
-            // ดึงจำนวนและหน่วยของสินค้าชิ้นแรกไปแสดงผลที่คอลัมน์ตารางภาพรวมหลัก
             if (index === 0) {
-                firstQty = qty;
-                firstUnit = unit;
+                firstRowQty = qty;
+                firstRowUnit = unit;
             }
         }
     });
@@ -240,9 +226,9 @@ async function saveLineOrderEdit(event) {
     let payload = {
         id: document.getElementById('edit-line-id').value,
         date: document.getElementById('edit-line-date').value,
-        product: formattedItemsString, // ชุดข้อความเรียงลำดับรายการต่อบรรทัด
-        qty: firstRowQty,              // จำนวนรายการแรก
-        unit: firstRowUnit,            // หน่วยรายการแรก
+        product: formattedItemsString, 
+        qty: firstRowQty,              
+        unit: firstRowUnit,            
         price: document.getElementById('edit-line-price').value,
         company: document.getElementById('edit-line-company').value,
         destination: document.getElementById('edit-line-destination').value,
@@ -268,7 +254,6 @@ async function saveLineOrderEdit(event) {
     }
 }
 
-// --- ฟังก์ชันการทำงานร่วมกันบริหารตารางและแดชบอร์ดตามโครงสร้างระบบเดิมของคุณ ---
 function showDashboardList(type) {
     currentDashboardType = type;
     const defaultView = document.getElementById('dashboard-default-view');
@@ -345,11 +330,17 @@ function renderDashboard() {
     const warning = state.stock.filter(i => i.status === 'ใกล้หมด').length;
     const critical = state.stock.filter(i => i.status === 'หมด').length;
 
-    document.getElementById('count-normal').innerText = normal;
-    document.getElementById('count-warning').innerText = warning;
-    document.getElementById('count-critical').innerText = critical;
-    document.getElementById('count-purchase').innerText = state.purchase.length;
-    document.getElementById('count-shipping').innerText = state.shipping.length;
+    const cNormal = document.getElementById('count-normal');
+    const cWarning = document.getElementById('count-warning');
+    const cCritical = document.getElementById('count-critical');
+    const cPurchase = document.getElementById('count-purchase');
+    const cShipping = document.getElementById('count-shipping');
+
+    if (cNormal) cNormal.innerText = normal;
+    if (cWarning) cWarning.innerText = warning;
+    if (cCritical) cCritical.innerText = critical;
+    if (cPurchase) cPurchase.innerText = state.purchase.length;
+    if (cShipping) cShipping.innerText = state.shipping.length;
 
     const quickBody = document.querySelector('#quick-stock-table tbody');
     if(quickBody) {
@@ -378,6 +369,7 @@ function renderChart() {
 
 function renderStockTable() {
     const tbody = document.querySelector('#table-stock tbody');
+    if (!tbody) return;
     tbody.innerHTML = state.stock.map((i, index) => `
         <tr id="row-stock-${index}">
             <td>${i.id || index + 1}</td>
@@ -395,6 +387,7 @@ function renderStockTable() {
 
 function renderPurchaseTable() {
     const tbody = document.querySelector('#table-purchase tbody');
+    if (!tbody) return;
     tbody.innerHTML = state.purchase.map((i, index) => `
         <tr id="row-purchase-${index}">
             <td>${i.id || index + 1}</td>
@@ -411,6 +404,7 @@ function renderPurchaseTable() {
 
 function renderShippingTable() {
     const tbody = document.querySelector('#table-shipping tbody');
+    if (!tbody) return;
     tbody.innerHTML = state.shipping.map((i, index) => `
         <tr id="row-shipping-${index}">
             <td>${i.id || index + 1}</td>
@@ -598,10 +592,12 @@ function updateNotificationBell() {
     if (count > lastNewOrderCount && lastNewOrderCount !== 0) {
         playNotificationSound();
         const bell = document.getElementById('notification-bell');
-        bell.classList.remove('notification-pulse');
-        setTimeout(() => {
-            bell.classList.add('notification-pulse');
-        }, 50);
+        if (bell) {
+            bell.classList.remove('notification-pulse');
+            setTimeout(() => {
+                bell.classList.add('notification-pulse');
+            }, 50);
+        }
 
         showToast('success', 'ออเดอร์ใหม่', `มีออเดอร์ใหม่ ${count - lastNewOrderCount} รายการ`);
     }
