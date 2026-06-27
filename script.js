@@ -1,6 +1,6 @@
 /**
  * MEDICHEN Warehouse & Dashboard - Frontend Script
- * ✨ อัปเดตระบบรองรับสถาปัตยกรรมคัดแยกออเดอร์เชื่อม LINE Webhook & Pop-up Modal อย่างสมบูรณ์ 100%
+ * ✨ อัปเดตแก้บั๊กตัวแปร Undefined และเพิ่มระบบ Auto-Forward ไปคิวจัดส่งเมื่อกดยืนยันออเดอร์
  */
 
 const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec"; 
@@ -12,6 +12,7 @@ let isEditing = false;
 let currentDashboardType = null;
 let previousLineCount = 0;
 let lastNewOrderCount = 0;
+let currentLineEditingIndex = null; // ตัวแปรใหม่สำหรับดักจับสถานะก่อนหน้า
 
 document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener(
@@ -29,6 +30,23 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         { once:true }
     );
+
+    // 🔑 ระบบ Simple Login (ข้ามได้ถ้ารหัสตรง)
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault(); 
+            const email = document.getElementById('loginUser').value.trim();
+            const pass = document.getElementById('loginPass').value.trim();
+            if (email === "admin@medichen.com" && pass === "123456") {
+                document.getElementById('loginPage').style.display = 'none';
+                showToast('success', 'เข้าสู่ระบบสำเร็จ', 'ยินดีต้อนรับเข้าสู่ระบบ MEDICHEN');
+            } else {
+                showToast('error', 'เข้าสู่ระบบล้มเหลว', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+            }
+        });
+    }
+
     fetchAllData();
     setInterval(() => {
         if (!isEditing) fetchAllData();
@@ -113,43 +131,54 @@ async function callAPI(action, data = {}) {
     return await response.json();
 }
 
+// 🛠️ แก้ไขการดึงตัวแปรให้ตรงกับฐานข้อมูลหลังบ้าน
 function renderLineTable() {
     const tbody = document.querySelector('#table-line tbody');
     if (!tbody) return;
-    tbody.innerHTML = state.line.map((i, index) => `
+    tbody.innerHTML = state.line.map((i, index) => {
+        // แก้การแมปปิ้งตัวแปรให้ตรงกับ Apps Script ที่ส่งมา
+        const dateDisplay = i.confirmDate || 'รอระบุ';
+        const itemDisplay = i.items || i.product || '-';
+        const amountDisplay = i.totalAmount && i.totalAmount !== '0' ? parseInt(i.totalAmount).toLocaleString() + ' บ.' : '-';
+        const destinationDisplay = i.hospitalName || i.address || '-';
+
+        return `
         <tr>
             <td>${i.id}</td>
-            <td>${i.date}</td>
-            <td style="max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${i.product || '-'}</b></td>
-            <td>${i.qty ? i.qty + ' ' + (i.unit || '') : '-'}</td>
-            <td>${i.price ? parseInt(i.price).toLocaleString() + ' บ.' : '-'}</td>
-            <td>${i.destination || '-'}</td>
+            <td>${dateDisplay}</td>
+            <td style="max-width:250px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><b>${itemDisplay}</b></td>
+            <td>-</td>
+            <td>${amountDisplay}</td>
+            <td>${destinationDisplay}</td>
             <td>${getStatusBadge(i.status || 'ออเดอร์ใหม่')}</td>
             <td>
                 <button class="btn btn-primary" onclick="openLineModal(${index})">📝 แยกข้อมูล / ดู</button>
                 <button class="btn btn-danger" onclick="handleDelete('deleteLineOrder', '${i.id}')">ลบ</button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function openLineModal(index) {
     isEditing = true; 
+    currentLineEditingIndex = index; // จำไว้ว่ากำลังแก้ไขรายการไหนอยู่
     const item = state.line[index];
     if (!item) return;
 
+    // โหลดข้อมูลใส่ Form ฟิลด์ต่างๆ โดยใช้ Key ที่ถูกต้อง
     document.getElementById('edit-line-id').value = item.id;
-    document.getElementById('edit-line-date').value = formatSafeDate(item.date);
-    document.getElementById('edit-line-product').value = item.product || '';
-    document.getElementById('edit-line-price').value = item.price || '';
-    document.getElementById('edit-line-company').value = item.company || '';
-    document.getElementById('edit-line-destination').value = item.destination || '';
+    document.getElementById('edit-line-date').value = formatSafeDate(item.confirmDate || '');
+    document.getElementById('edit-line-price').value = item.totalAmount || '';
+    document.getElementById('edit-line-destination').value = item.hospitalName || item.address || '';
     document.getElementById('edit-line-status').value = item.status || 'ออเดอร์ใหม่';
+    document.getElementById('edit-line-company').value = ''; // ขนส่งเป็นข้อมูลใหม่ ต้องกรอกเพิ่มเอง
+    document.getElementById('edit-line-product').value = item.items || item.product || ''; 
 
+    // แตกแถวสินค้าไดนามิก
     const container = document.getElementById('modal-dynamic-items-container');
     if (container) {
         container.innerHTML = ''; 
-        const rawProductText = item.product || '';
+        const rawProductText = item.items || item.product || '';
         
         if (rawProductText) {
             const lines = rawProductText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -192,15 +221,15 @@ function closeLineModal() {
     const container = document.getElementById('modal-dynamic-items-container');
     if (container) container.innerHTML = '';
     isEditing = false;
+    currentLineEditingIndex = null;
 }
 
+// 💾 บันทึกและ Auto-Forward ส่งเข้าคิวจัดส่ง
 async function saveLineOrderEdit(event) {
     event.preventDefault();
     
     const rows = document.querySelectorAll('.modal-dynamic-product-row');
     let combinedItemsArray = [];
-    let firstRowQty = '';
-    let firstRowUnit = '';
 
     rows.forEach((row, index) => {
         const name = row.querySelector('.modal-input-item-name').value.trim();
@@ -213,38 +242,47 @@ async function saveLineOrderEdit(event) {
             if (unit) itemString += ` ${unit}`;
             
             combinedItemsArray.push(`${index + 1}. ${itemString}`);
-            
-            if (index === 0) {
-                firstRowQty = qty;
-                firstRowUnit = unit;
-            }
         }
     });
 
     const formattedItemsString = combinedItemsArray.join('\n');
+    const newStatus = document.getElementById('edit-line-status').value;
+    const confirmDateVal = document.getElementById('edit-line-date').value;
+    const destinationVal = document.getElementById('edit-line-destination').value;
+    const companyVal = document.getElementById('edit-line-company').value;
 
     let payload = {
         id: document.getElementById('edit-line-id').value,
-        date: document.getElementById('edit-line-date').value,
-        product: formattedItemsString, 
-        qty: firstRowQty,              
-        unit: firstRowUnit,            
-        price: document.getElementById('edit-line-price').value,
-        company: document.getElementById('edit-line-company').value,
-        destination: document.getElementById('edit-line-destination').value,
-        status: document.getElementById('edit-line-status').value
+        confirmDate: confirmDateVal,
+        items: formattedItemsString, 
+        totalAmount: document.getElementById('edit-line-price').value,
+        hospitalName: destinationVal,
+        status: newStatus
     };
 
+    const prevStatus = state.line[currentLineEditingIndex].status;
     const loadingToast = showToast('loading', 'กำลังบันทึกข้อมูล', 'กรุณารอสักครู่...');
 
     try {
+        // ✨ Auto-Forward Logic: ถ้ายืนยันออเดอร์ (และก่อนหน้านี้ยังไม่ได้ยืนยัน) ให้ยิงเข้าคิวจัดส่งให้เลย
+        if (newStatus === 'ยืนยันออเดอร์' && prevStatus !== 'ยืนยันออเดอร์') {
+            await callAPI('addShipping', {
+                date: confirmDateVal || new Date().toISOString().split('T')[0],
+                product: formattedItemsString,
+                company: companyVal || 'รอระบุขนส่ง',
+                destination: destinationVal || 'รอระบุปลายทาง',
+                status: 'เตรียมสินค้า'
+            });
+        }
+
+        // อัปเดตข้อมูลในตาราง LINE Orders
         const res = await callAPI('updateLineOrder', payload);
         loadingToast.remove();
 
         if (res.status === 'success') {
             closeLineModal();
             await fetchAllData();
-            showToast('success', 'บันทึกสำเร็จ', 'คัดแยกและแก้ไขออเดอร์เรียบร้อยแล้ว');
+            showToast('success', 'บันทึกสำเร็จ', 'อัปเดตและคัดแยกออเดอร์เรียบร้อยแล้ว');
         } else {
             showToast('error', 'เกิดข้อผิดพลาด', res.message);
         }
