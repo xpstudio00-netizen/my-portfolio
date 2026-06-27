@@ -65,6 +65,14 @@ function switchTab(tabId) {
     if (pageTitle) pageTitle.innerText = titles[tabId];
 }
 
+function getStatusBadge(status) {
+    const safeStatus = status || 'ไม่มีสถานะ';
+    if (['ปกติ', 'จ่ายแล้ว', 'จัดส่งเสร็จแล้ว', 'ยืนยันออเดอร์'].includes(safeStatus)) return `<span class="badge badge-success">${safeStatus}</span>`;
+    if (['ใกล้หมด', 'รอโอน', 'จัดส่ง', 'กำลังจัดส่ง', 'รอระบุข้อมูล'].includes(safeStatus)) return `<span class="badge badge-warning">${safeStatus}</span>`;
+    if (['ออเดอร์ใหม่'].includes(safeStatus)) return `<span class="badge badge-line">${safeStatus}</span>`;
+    return `<span class="badge badge-danger">${safeStatus}</span>`;
+}
+
 async function fetchAllData() {
     try {
         const [stkRes, purRes, shpRes, lineRes] = await Promise.all([
@@ -103,14 +111,6 @@ async function callAPI(action, data = {}) {
         body: JSON.stringify({ action, data })
     });
     return await response.json();
-}
-
-function getStatusBadge(status) {
-    const safeStatus = status || 'ไม่มีสถานะ';
-    if (['ปกติ', 'จ่ายแล้ว', 'จัดส่งเสร็จแล้ว', 'ยืนยันออเดอร์'].includes(safeStatus)) return `<span class="badge badge-success">${safeStatus}</span>`;
-    if (['ใกล้หมด', 'รอโอน', 'จัดส่ง', 'กำลังจัดส่ง', 'รอระบุข้อมูล'].includes(safeStatus)) return `<span class="badge badge-warning">${safeStatus}</span>`;
-    if (['ออเดอร์ใหม่'].includes(safeStatus)) return `<span class="badge badge-line">${safeStatus}</span>`;
-    return `<span class="badge badge-danger">${safeStatus}</span>`;
 }
 
 function renderLineTable() {
