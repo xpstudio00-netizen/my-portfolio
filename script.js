@@ -1,6 +1,6 @@
 /**
  * MEDICHEN Warehouse & Dashboard - Frontend Script
- * ✨ อัปเดตแก้บั๊กตัวแปร Undefined และเพิ่มระบบ Auto-Forward ไปคิวจัดส่งเมื่อกดยืนยันออเดอร์
+ * ✨ อัปเดตระบความปลอดภัยยืนยันสิทธิ์ผ่านหลังบ้าน และจัดการตัวแปรออเดอร์อย่างสมบูรณ์ไร้รอยต่อ
  */
 
 const API_URL = "https://script.google.com/macros/s/AKfycbzUSfC0UMS1rLJTpVBbL1koAKUkHZcLIlQvLz98J2UzSwFUo-2sdqckWaiXNoEGgWJd/exec"; 
@@ -12,9 +12,23 @@ let isEditing = false;
 let currentDashboardType = null;
 let previousLineCount = 0;
 let lastNewOrderCount = 0;
-let currentLineEditingIndex = null; // ตัวแปรใหม่สำหรับดักจับสถานะก่อนหน้า
+let currentLineEditingIndex = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+    // ผูกระบบล็อกอินเข้ากับปุ่มส่งข้อมูลบนฟอร์มหน้าจอ
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLoginSubmit);
+    }
+
+    // 🛡️ ตรวจเช็คสิทธิ์ในคลังเก็บ Session ชั่วคราวของเบราว์เซอร์
+    if (sessionStorage.getItem('medichen_authenticated') === 'true') {
+        document.getElementById('loginPage').style.display = 'none';
+        startAppEngine(); // ถ้ายืนยันสิทธิ์ค้างไว้แล้ว ให้เริ่มระบบดึงข้อมูลทันที
+    } else {
+        document.getElementById('loginPage').style.display = 'flex';
+    }
+
     document.addEventListener(
         'click',
         () => {
@@ -30,28 +44,45 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         { once:true }
     );
+});
 
-    // 🔑 ระบบ Simple Login (ข้ามได้ถ้ารหัสตรง)
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault(); 
-            const email = document.getElementById('loginUser').value.trim();
-            const pass = document.getElementById('loginPass').value.trim();
-            if (email === "admin@medichen.com" && pass === "123456") {
-                document.getElementById('loginPage').style.display = 'none';
-                showToast('success', 'เข้าสู่ระบบสำเร็จ', 'ยินดีต้อนรับเข้าสู่ระบบ MEDICHEN');
-            } else {
-                showToast('error', 'เข้าสู่ระบบล้มเหลว', 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-            }
-        });
+// 🔒 ฟังก์ชันส่งข้อมูลรหัสผ่านไปตรวจสอบความปลอดภัยที่ระบบเซิร์ฟเวอร์หลังบ้าน
+async function handleLoginSubmit(event) {
+    event.preventDefault();
+    const userEmail = document.getElementById('loginUser').value.trim();
+    const userPassword = document.getElementById('loginPass').value.trim();
+
+    const loadingToast = showToast('loading', 'กำลังตรวจสอบสิทธิ์', 'กรุณารอสักครู่...');
+
+    try {
+        // ยิงข้อมูลไปหาคำสั่ง verifyLogin ที่ตั้งค่าไว้ในฟังก์ชัน doPost หลังบ้าน
+        const res = await callAPI('verifyLogin', { username: userEmail, password: userPassword });
+        loadingToast.remove();
+
+        if (res.status === 'success' && res.data.authorized === true) {
+            // บันทึกสถานะการล็อกอินสำเร็จลงในหน่วยความจำชั่วคราวเบราว์เซอร์
+            sessionStorage.setItem('medichen_authenticated', 'true');
+            document.getElementById('loginPage').style.display = 'none';
+            showToast('success', 'เข้าสู่ระบบสำเร็จ', 'ยินดีต้อนรับเข้าสู่ระบบ MEDICHEN');
+            
+            // 🚀 เริ่มต้นทำงานดึงข้อมูลคลังหลังจากระบบยืนยันความปลอดภัยผ่านแล้วเท่านั้น
+            startAppEngine();
+        } else {
+            showToast('error', 'ปฏิเสธการเข้าสู่ระบบ', res.data.message || 'รหัสผ่านไม่ถูกต้อง');
+        }
+    } catch (error) {
+        loadingToast.remove();
+        showToast('error', 'ระบบรักษาความปลอดภัยขัดข้อง', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ตรวจสอบรหัสผ่านได้');
     }
+}
 
+// ฟังก์ชันเริ่มรันระบบวนรอบรีเฟรชข้อมูลแบบเรียลไทม์
+function startAppEngine() {
     fetchAllData();
     setInterval(() => {
         if (!isEditing) fetchAllData();
     }, 5000);
-});
+}
 
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -131,12 +162,10 @@ async function callAPI(action, data = {}) {
     return await response.json();
 }
 
-// 🛠️ แก้ไขการดึงตัวแปรให้ตรงกับฐานข้อมูลหลังบ้าน
 function renderLineTable() {
     const tbody = document.querySelector('#table-line tbody');
     if (!tbody) return;
     tbody.innerHTML = state.line.map((i, index) => {
-        // แก้การแมปปิ้งตัวแปรให้ตรงกับ Apps Script ที่ส่งมา
         const dateDisplay = i.confirmDate || 'รอระบุ';
         const itemDisplay = i.items || i.product || '-';
         const amountDisplay = i.totalAmount && i.totalAmount !== '0' ? parseInt(i.totalAmount).toLocaleString() + ' บ.' : '-';
@@ -161,20 +190,18 @@ function renderLineTable() {
 
 function openLineModal(index) {
     isEditing = true; 
-    currentLineEditingIndex = index; // จำไว้ว่ากำลังแก้ไขรายการไหนอยู่
+    currentLineEditingIndex = index;
     const item = state.line[index];
     if (!item) return;
 
-    // โหลดข้อมูลใส่ Form ฟิลด์ต่างๆ โดยใช้ Key ที่ถูกต้อง
     document.getElementById('edit-line-id').value = item.id;
     document.getElementById('edit-line-date').value = formatSafeDate(item.confirmDate || '');
     document.getElementById('edit-line-price').value = item.totalAmount || '';
     document.getElementById('edit-line-destination').value = item.hospitalName || item.address || '';
     document.getElementById('edit-line-status').value = item.status || 'ออเดอร์ใหม่';
-    document.getElementById('edit-line-company').value = ''; // ขนส่งเป็นข้อมูลใหม่ ต้องกรอกเพิ่มเอง
+    document.getElementById('edit-line-company').value = ''; 
     document.getElementById('edit-line-product').value = item.items || item.product || ''; 
 
-    // แตกแถวสินค้าไดนามิก
     const container = document.getElementById('modal-dynamic-items-container');
     if (container) {
         container.innerHTML = ''; 
@@ -224,12 +251,13 @@ function closeLineModal() {
     currentLineEditingIndex = null;
 }
 
-// 💾 บันทึกและ Auto-Forward ส่งเข้าคิวจัดส่ง
 async function saveLineOrderEdit(event) {
     event.preventDefault();
     
     const rows = document.querySelectorAll('.modal-dynamic-product-row');
     let combinedItemsArray = [];
+    let firstRowQty = '';
+    let firstRowUnit = '';
 
     rows.forEach((row, index) => {
         const name = row.querySelector('.modal-input-item-name').value.trim();
@@ -242,6 +270,11 @@ async function saveLineOrderEdit(event) {
             if (unit) itemString += ` ${unit}`;
             
             combinedItemsArray.push(`${index + 1}. ${itemString}`);
+            
+            if (index === 0) {
+                firstRowQty = qty;
+                firstRowUnit = unit;
+            }
         }
     });
 
@@ -255,8 +288,11 @@ async function saveLineOrderEdit(event) {
         id: document.getElementById('edit-line-id').value,
         confirmDate: confirmDateVal,
         items: formattedItemsString, 
+        qty: firstRowQty,
+        unit: firstRowUnit,
         totalAmount: document.getElementById('edit-line-price').value,
         hospitalName: destinationVal,
+        company: companyVal,
         status: newStatus
     };
 
@@ -264,7 +300,6 @@ async function saveLineOrderEdit(event) {
     const loadingToast = showToast('loading', 'กำลังบันทึกข้อมูล', 'กรุณารอสักครู่...');
 
     try {
-        // ✨ Auto-Forward Logic: ถ้ายืนยันออเดอร์ (และก่อนหน้านี้ยังไม่ได้ยืนยัน) ให้ยิงเข้าคิวจัดส่งให้เลย
         if (newStatus === 'ยืนยันออเดอร์' && prevStatus !== 'ยืนยันออเดอร์') {
             await callAPI('addShipping', {
                 date: confirmDateVal || new Date().toISOString().split('T')[0],
@@ -275,7 +310,6 @@ async function saveLineOrderEdit(event) {
             });
         }
 
-        // อัปเดตข้อมูลในตาราง LINE Orders
         const res = await callAPI('updateLineOrder', payload);
         loadingToast.remove();
 
